@@ -1,14 +1,18 @@
 # Application
 
-`Application` is a Swift package for shared app-level orchestration and state.
-
-## Contents
-
-- App lifecycle and engine logic
-- Shared app state modeling
-- Change monitoring helpers
+`Application` is a Swift package for coordinating SwiftUI app lifecycles and monitoring changes.
 
 ## Lifecycle
+
+### Motivation
+
+Show a responsive interface as soon as the app has enough services to support it. The startup view can use lightweight services immediately while the app loads storage or other dependencies. The running view receives the full environment once startup succeeds, so ordinary screens can assume their services are ready.
+
+Give configuration and repair a place outside the normal runtime. An app can enter configuration before opening resources, or shut down the current runtime before entering it. This gives the app a chance to change a setting, switch storage, or repair data while normal services are stopped. Continuing creates a fresh runtime in the same process with the new configuration.
+
+Keep those transitions in one coordinator so windows and commands can follow the same phase. Apps can supply their own startup, configuration, and error screens as needed, and a small app can rely on the standard views.
+
+### Getting started
 
 Keep one `AppLifecycle` at the app root. It coordinates launch and transitions. Its factory creates an `AppRuntime`, which owns the services and observable state for one run.
 
@@ -57,19 +61,15 @@ The [TestApplication Xcode project](Extras/TestApplication/TestApplication.xcode
 3. Apply the old startup and running injectors inside the corresponding `rootView` builders. Use the same phase to gate other windows, settings, and commands that depend on the running services.
 4. Give the failure view actions appropriate to the failed operation. After startup fails and cleanup succeeds, `startRunning()` retries with a fresh instance. If teardown itself fails, `retryShutdown()` finishes cleanup on the same instance. Handle errors from ordinary running commands in the app's own error presentation.
 
-## Change monitoring
+## Notifications and Observation
 
-`onChange(of:perform:)` tracks a main-actor Observation value and delivers its
-latest value on the main actor. Mutations before delivery can coalesce; mutations
-inside the callback precede the next tracking pass. Retain the returned
-`ObservationToken` when cancellation is needed. Call `cancel()` to stop delivery
-and release captured callbacks and value readers immediately. Discarding the
-token preserves fire-and-forget observation.
+### Notifications
 
-`NotificationCenter.onNotification(named:object:perform:)` and
-`UserDefaults.onChange(initial:_:)` return a `NotificationToken`. Retain this token
-while monitoring is wanted; cancellation or destruction removes its observer.
-The defaults helper can call its handler immediately with `initial: true`.
+`NotificationCenter.onNotification(named:object:perform:)` and `UserDefaults.onChange(initial:_:)` return a `NotificationToken`. Retain the token while monitoring is wanted. Cancelling or dropping it removes the observer. Pass `initial: true` to the defaults helper to call the handler immediately.
+
+### Observation
+
+`onChange(of:perform:)` tracks a main-actor Observation value and delivers its latest value on the main actor. Mutations before delivery can coalesce, and mutations inside the callback precede the next tracking pass. Retain the returned `ObservationToken` when cancellation is needed. Call `cancel()` to stop delivery and release captured callbacks and value readers immediately. Discarding the token preserves fire-and-forget observation.
 
 ## Project records
 
