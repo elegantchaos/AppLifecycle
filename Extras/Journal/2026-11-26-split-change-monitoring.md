@@ -7,3 +7,7 @@ The two halves shared no code or state; the package had no globals, and neither 
 The monitoring sources and tests were copied to ChangeMonitoring from `7d844f5`, where their history remains. The demo's `CounterMirror`, which used `onChange(of:perform:)`, now follows the counter with an `Observations` sequence in a task it owns; the runtime cancels and awaits that task during shutdown. The README's shutdown example uses the same pattern, and its migration steps cover the rename and the move.
 
 The local checkout folder is still named `Application`. The GitHub repository rename to `elegantchaos/AppLifecycle` and creation of `elegantchaos/ChangeMonitoring` are separate steps. Bookish and ActionStatus still depend on the 1.x `Application` package and are unchanged.
+
+## Follow-up: Repositories
+
+`elegantchaos/ChangeMonitoring` was created as a public repository with the new package's history, untagged until ActionStatus has moved onto it. `elegantchaos/Application` was renamed `elegantchaos/AppLifecycle`; GitHub redirects the old URL, and PR #2 moved with it. Both packages built for macOS, iOS, tvOS and watchOS and passed their macOS tests through `agt validate --full` with explicit platforms. No decision record was written for the split; this entry records it.
