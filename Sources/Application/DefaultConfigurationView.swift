@@ -5,7 +5,11 @@
 
 import SwiftUI
 
-/// Offers a single control that starts the app from configuration mode.
+/// Offers an unlabelled start control in configuration mode.
+///
+/// The play symbol's system accessibility description names the control, so
+/// the package ships no user-facing text. Apps that use configuration mode
+/// normally supply their own view.
 public struct DefaultConfigurationView: View {
   /// Starts a fresh runtime.
   private let start: @MainActor () -> Void
@@ -15,9 +19,13 @@ public struct DefaultConfigurationView: View {
     self.start = start
   }
 
-  /// A button that starts the app.
+  /// A play button that starts the app.
   public var body: some View {
-    Button(action: start) { Text("Start App", bundle: .module) }
+    Button(action: start) {
+      Image(systemName: "play.circle")
+        .font(.largeTitle)
+    }
+    .buttonStyle(.borderless)
   }
 }
 

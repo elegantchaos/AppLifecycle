@@ -1,7 +1,7 @@
 # Project Specific Rules
 
 - This package provides shared app-level orchestration, lifecycle support, state modeling, and change monitoring for SwiftUI applications.
-- Target macOS 26.0+, iOS 26.0+, and tvOS 26.0+.
+- Target macOS 26.0+, iOS 26.0+, tvOS 26.0+, and watchOS 26.0+.
 - The codebase uses Swift 6.2 with modern concurrency.
 - Regular package targets default to `MainActor` isolation. Keep executor assumptions explicit and avoid accidental cross-actor access.
 - Keep a development journal in `Extras/Journal/`, with a dated entry for significant work and an updated `index.md`.

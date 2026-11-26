@@ -39,6 +39,9 @@ public final class AppLifecycle<Runtime: AppRuntime> {
   /// Keeps a partially stopped runtime available for another shutdown attempt.
   @ObservationIgnored private var pendingShutdown: Runtime?
 
+  /// Requests from `runningRuntime()` waiting for the next phase change, by request.
+  @ObservationIgnored private var phaseWaiters: [UUID: CheckedContinuation<Void, any Error>] = [:]
+
   /// Work owned by the lifecycle, independent of the requesting view or command.
   @ObservationIgnored private(set) var transitionTask: Task<Void, Never>?
 
@@ -55,6 +58,31 @@ public final class AppLifecycle<Runtime: AppRuntime> {
   public var phase: Phase {
     access(keyPath: \.phase)
     return committedPhase
+  }
+
+  /// Returns the running runtime, waiting through launch, startup and shutdown if needed.
+  ///
+  /// Use this from code outside the view tree, such as App Intents or URL
+  /// handlers, that may run before startup finishes. A request made before
+  /// launch waits for the host to launch. It throws the error that stopped the
+  /// runtime if startup or shutdown fails, `AppLifecycleError.configurationMode`
+  /// in configuration mode, and `CancellationError` if the caller is cancelled.
+  /// The runtime can later shut down, so use it for the work at hand rather
+  /// than keeping it.
+  public func runningRuntime() async throws -> Runtime {
+    while true {
+      try Task.checkCancellation()
+      switch committedPhase {
+        case .running(let runtime, _):
+          return runtime
+        case .failed(let failure):
+          throw failure.error
+        case .configuration:
+          throw AppLifecycleError.configurationMode
+        case .idle, .preparing, .starting, .shuttingDown:
+          try await nextPublication()
+      }
+    }
   }
 
   /// Launches once. Choosing configuration mode leaves the runtime factory untouched.
@@ -173,6 +201,37 @@ public final class AppLifecycle<Runtime: AppRuntime> {
       hasUnpublishedPhase = false
       withMutation(keyPath: \.phase) {}
     } while hasUnpublishedPhase
+
+    let waiters = phaseWaiters.values
+    phaseWaiters = [:]
+    for waiter in waiters {
+      waiter.resume()
+    }
+  }
+
+  /// Suspends until the next phase is published, or throws if the caller is cancelled.
+  private func nextPublication() async throws {
+    let id = UUID()
+    try await withTaskCancellationHandler {
+      try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+        if Task.isCancelled {
+          continuation.resume(throwing: CancellationError())
+        } else {
+          self.phaseWaiters[id] = continuation
+        }
+      }
+    } onCancel: { [weak self] in
+      // The handler can run on any executor, so the waiter is removed on the
+      // main actor, after the continuation above has been stored.
+      Task { @MainActor in
+        self?.cancelWaiter(id)
+      }
+    }
+  }
+
+  /// Ends one waiting request with a cancellation error if it is still waiting.
+  private func cancelWaiter(_ id: UUID) {
+    phaseWaiters.removeValue(forKey: id)?.resume(throwing: CancellationError())
   }
 
   /// Selects the application's initial destination.

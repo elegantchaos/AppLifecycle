@@ -5,29 +5,32 @@
 
 import SwiftUI
 
-/// Describes a failed startup or shutdown and offers to retry it.
+/// Shows a warning symbol and a retry control when startup or shutdown fails.
+///
+/// The symbols' system accessibility descriptions name them, so the package
+/// ships no user-facing text. Apps that want to explain the failure supply
+/// their own view, which receives the failure and the same retry action.
 public struct DefaultFailureView: View {
-  /// The failure to describe.
-  private let failure: AppLifecycleFailure
-
   /// Retries the failed operation.
   private let retry: @MainActor () -> Void
 
-  /// Creates the standard failure presentation for a failure and its retry action.
-  public init(failure: AppLifecycleFailure, retry: @escaping @MainActor () -> Void) {
-    self.failure = failure
+  /// Creates the standard failure presentation for the supplied retry action.
+  public init(retry: @escaping @MainActor () -> Void) {
     self.retry = retry
   }
 
-  /// The error description and a retry button.
+  /// A yellow warning triangle above a retry button.
   public var body: some View {
-    VStack {
-      Text(failure.error.localizedDescription)
-      Button(action: retry) { Text("Retry", bundle: .module) }
+    VStack(spacing: 12) {
+      Image(systemName: "exclamationmark.triangle.fill")
+        .foregroundStyle(.yellow)
+      Button(action: retry) {
+        Image(systemName: "arrow.clockwise")
+      }
+      .buttonStyle(.borderless)
     }
+    .font(.largeTitle)
   }
 }
 
-#Preview {
-  DefaultFailureView(failure: .startup(CocoaError(.fileReadNoSuchFile))) {}
-}
+#Preview { DefaultFailureView {} }

@@ -43,7 +43,7 @@ struct ExampleApp: App {
 }
 ```
 
-Implement `startup()` if there is work to finish before showing the running view; it is optional. Every runtime declares its teardown. Implement `shutdown()` when the runtime starts tasks, observers or subscriptions, or opens stores, and conform to `AppRuntimeWithoutTeardown` only when dropping the runtime ends everything it started. Both hooks accept nonthrowing implementations. The shell supplies progress, configuration and retry views by default, and exposes them as `DefaultStartupView`, `DefaultConfigurationView`, `DefaultShutdownView` and `DefaultFailureView` for apps that customise only some phases. Configuration is entered only when the app requests it.
+Implement `startup()` if there is work to finish before showing the running view; it is optional. Every runtime declares its teardown. Implement `shutdown()` when the runtime starts tasks, observers or subscriptions, or opens stores, and conform to `AppRuntimeWithoutTeardown` only when dropping the runtime ends everything it started. Both hooks accept nonthrowing implementations. The package ships no user-facing text. Its default views are symbols only: `DefaultProgressView` while preparing, starting and shutting down, `DefaultConfigurationView` with a play button, and `DefaultFailureView` with a warning triangle and a retry button. They suit apps with nothing to say during those phases; an app with a real startup, configuration or failure story supplies its own views. Configuration is entered only when the app requests it.
 
 ### Shutdown and ownership
 
@@ -80,12 +80,24 @@ final class LibraryRuntime: AppRuntime {
 }
 ```
 
+### Waiting for the runtime outside the view tree
+
+App Intents, URL handlers and other entry points can run before startup finishes, or without any window appearing. Launch the lifecycle from the app's initializer so startup does not depend on a view, then await the runtime:
+
+```swift
+AppDependencyManager.shared.add {
+  try await lifecycle.runningRuntime().store
+}
+```
+
+`runningRuntime()` returns at once while running and otherwise waits through launch, startup and shutdown. It throws the failing error after a startup or shutdown failure, `AppLifecycleError.configurationMode` in configuration mode, and `CancellationError` if the caller is cancelled. Use the runtime for the work at hand; it can shut down later.
+
 Phase observers can request transitions from inside their change notification, for example entering configuration as soon as a run starts. The request is checked against the phase being published and takes effect after the current notification finishes.
 
 ### Customising the lifecycle
 
 - Call `launch()` for normal startup or `launch(in: .configuration)` to open configuration mode before the factory runs. Keep the factory cheap and put resource loading in the runtime's asynchronous `startup()`.
-- The factory can create early services that are ready immediately. Return them through `AppRuntime.startupContext` so `rootView(running:startup:configuration:shutdown:failure:)` can give the startup view its own environment while asynchronous loading runs. With no early services, the context defaults to `Void` and the startup builder can ignore it. The running builder receives the same runtime, including its early services, with a fresh SwiftUI identity each run. A custom configuration view receives the start action, and a custom failure view receives an `AppLifecycleFailure` and the appropriate retry action. Check the phase before exposing run-specific commands or injecting services into additional scenes.
+- The factory can create early services that are ready immediately. Return them through `AppRuntime.startupContext` so `rootView(running:preparing:startup:configuration:shutdown:failure:)` can give the startup view its own environment while asynchronous loading runs. The preparing builder covers the moment before the factory has returned, when no context exists yet; supply it with the same loading view to keep launch seamless. With no early services, the context defaults to `Void` and the startup builder can ignore it. The running builder receives the same runtime, including its early services, with a fresh SwiftUI identity each run. A custom configuration view receives the start action, and a custom failure view receives an `AppLifecycleFailure` and the appropriate retry action. Check the phase before exposing run-specific commands or injecting services into additional scenes.
 - Call `enterConfiguration()` to withdraw the running environment and let the runtime stop accepting work, drain or cancel and await work, and release its resources. A failed shutdown keeps configuration mode and startup unavailable. `retryShutdown()` retries on the same instance. The lifecycle also shuts down a partially started runtime when startup throws.
 - From the configuration UI, change the settings used by the runtime factory and call `startRunning()` to build another runtime. Apps choose which services require explicit teardown and which configuration persists across runs.
 

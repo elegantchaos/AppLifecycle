@@ -441,7 +441,11 @@ struct AppLifecycleTests {
       return
     }
     #expect(runtime.didStart)
-    _ = lifecycle.rootView(running: { _ in Text("Ready") }, startup: { _ in Text("Starting") })
+    _ = lifecycle.rootView(
+      running: { _ in Text("Ready") },
+      preparing: { Text("Preparing") },
+      startup: { _ in Text("Starting") }
+    )
 
     lifecycle.enterConfiguration()
     let shutdown = try #require(lifecycle.transitionTask)
