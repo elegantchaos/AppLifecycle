@@ -1,5 +1,9 @@
 # Development journal
 
+## 2026-11-26
+
+- [Proposed Maintenance Lifecycle](2026-11-26-maintenance-lifecycle.md) records the lifecycle investigation, the per-run runtime API, and the standalone counter demo.
+
 ## 2026-10-27
 
 - [Planned: alternative startup and in-process restart](2026-10-27-startup-modes-and-restart.md):

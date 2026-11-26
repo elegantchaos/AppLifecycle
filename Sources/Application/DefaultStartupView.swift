@@ -5,7 +5,7 @@
 
 import SwiftUI
 
-/// Displays an indeterminate progress indicator while the engine starts.
+/// Displays an indeterminate progress indicator while the runtime is being prepared.
 public struct DefaultStartupView: View {
   /// Creates the standard startup presentation.
   public init() {}
