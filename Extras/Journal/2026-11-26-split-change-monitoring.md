@@ -11,3 +11,7 @@ The local checkout folder is still named `Application`. The GitHub repository re
 ## Follow-up: Repositories
 
 `elegantchaos/ChangeMonitoring` was created as a public repository with the new package's history, untagged until ActionStatus has moved onto it. `elegantchaos/Application` was renamed `elegantchaos/AppLifecycle`; GitHub redirects the old URL, and PR #2 moved with it. Both packages built for macOS, iOS, tvOS and watchOS and passed their macOS tests through `agt validate --full` with explicit platforms. No decision record was written for the split; this entry records it.
+
+## Follow-up: ChangeMonitoring 1.0
+
+ChangeMonitoring gained an MIT licence, matching the other Elegant Chaos packages, and was released as [v1.0.0](https://github.com/elegantchaos/ChangeMonitoring/releases/tag/v1.0.0) without waiting for ActionStatus to move onto it.
