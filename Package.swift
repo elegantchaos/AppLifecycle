@@ -7,28 +7,28 @@
 
 import PackageDescription
 
-/// Shared application orchestration and its regression tests.
+/// Application lifecycle coordination for SwiftUI apps, and its regression tests.
 let package = Package(
-  name: "Application",
+  name: "AppLifecycle",
 
   platforms: [
-    .macOS("26.0"), .iOS("26.0"), .tvOS("26.0"),
+    .macOS("26.0"), .iOS("26.0"), .tvOS("26.0"), .watchOS("26.0"),
   ],
 
   products: [
     .library(
-      name: "Application",
-      targets: ["Application"]
+      name: "AppLifecycle",
+      targets: ["AppLifecycle"]
     )
   ],
 
   targets: [
     .target(
-      name: "Application"
+      name: "AppLifecycle"
     ),
     .testTarget(
-      name: "ApplicationTests",
-      dependencies: ["Application"]
+      name: "AppLifecycleTests",
+      dependencies: ["AppLifecycle"]
     ),
   ]
 )

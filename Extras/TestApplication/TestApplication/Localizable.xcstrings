@@ -1,0 +1,126 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Active Storage" : {
+
+    },
+    "Configuration" : {
+
+    },
+    "Configure Counter…" : {
+
+    },
+    "Count" : {
+
+    },
+    "Counter" : {
+
+    },
+    "Counter Lifecycle" : {
+
+    },
+    "Display Settings" : {
+
+    },
+    "Increment" : {
+
+    },
+    "Keeps the count between runs and across app launches." : {
+
+    },
+    "Last Closed Storage" : {
+
+    },
+    "Launching" : {
+
+    },
+    "Next count set to 10" : {
+
+    },
+    "Observed Count" : {
+
+    },
+    "Opening storage…" : {
+
+    },
+    "Retry Shutdown" : {
+
+    },
+    "Retry Startup" : {
+
+    },
+    "Retry startup or open Configuration to change storage." : {
+
+    },
+    "Running" : {
+
+    },
+    "Saved" : {
+
+    },
+    "Seed to 10" : {
+
+    },
+    "Show Observed Count" : {
+
+    },
+    "Shutdown Failed" : {
+
+    },
+    "Shutdown must finish before you can change storage or start a new counter." : {
+
+    },
+    "Shutting Down" : {
+
+    },
+    "Slow Down Transitions" : {
+
+    },
+    "Start Counter" : {
+
+    },
+    "Starting" : {
+
+    },
+    "Starts fresh each run. Changes are kept only while the counter is running." : {
+
+    },
+    "Startup Failed" : {
+
+    },
+    "Storage" : {
+
+    },
+    "Storage for Next Run" : {
+
+    },
+    "Temporary" : {
+
+    },
+    "The app has not launched yet." : {
+
+    },
+    "The app shuts down the current counter before opening Configuration." : {
+
+    },
+    "The counter is offline. Choose or seed storage, then start a fresh runtime." : {
+
+    },
+    "The counter is open and its services are ready." : {
+
+    },
+    "The current runtime is closing the counter and stopping observation." : {
+
+    },
+    "The display settings are ready while the counter loads its storage." : {
+
+    },
+    "This choice carries through to the running screen." : {
+
+    },
+    "Waiting for shutdown to finish…" : {
+
+    }
+  },
+  "version" : "1.0"
+}

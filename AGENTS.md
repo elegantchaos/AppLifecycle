@@ -1,7 +1,7 @@
 # Project Specific Rules
 
-- This package provides shared app-level orchestration, lifecycle support, state modeling, and change monitoring for SwiftUI applications.
-- Target macOS 26.0+, iOS 26.0+, and tvOS 26.0+.
+- This package coordinates the lifecycle of SwiftUI applications: launch, asynchronous startup, configuration mode and in-process restart of a per-run runtime. Change monitoring lives in the separate ChangeMonitoring package.
+- Target macOS 26.0+, iOS 26.0+, tvOS 26.0+, and watchOS 26.0+.
 - The codebase uses Swift 6.2 with modern concurrency.
 - Regular package targets default to `MainActor` isolation. Keep executor assumptions explicit and avoid accidental cross-actor access.
 - Keep a development journal in `Extras/Journal/`, with a dated entry for significant work and an updated `index.md`.
@@ -19,7 +19,8 @@
 
 - Follow the `baseline:standards` skill for all coding.
 - Use the `baseline:review` skill for reviewing pull requests and completed work.
-- Use the `codex-git` skill for git and GitHub operations.
+- Use the `baseline:records` skill for the development journal and decision log.
+- Use the `baseline:git` skill for git and GitHub operations.
 - Use the `swift:language` skill for all Swift code.
 - Also use the `swift:swiftui` skill for SwiftUI code.
 - Also use the `swift:testing` skill for Swift Testing work.

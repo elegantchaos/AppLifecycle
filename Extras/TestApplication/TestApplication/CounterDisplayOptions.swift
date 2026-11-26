@@ -1,14 +1,14 @@
 // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-//  Created by Sam Deane on 15/10/2026.
+//  Created by Sam Deane on 26/11/2026.
 //  Copyright © 2026 Elegant Chaos Limited. All rights reserved.
 // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 import Observation
 
-/// Observable scalar used by change-delivery and resource-lifetime tests.
+/// Holds the display choice shared by a run's startup and running screens.
 @MainActor
 @Observable
-final class ObservableValue {
-  /// Current value reported by the observation helper.
-  var value = 0
+final class CounterDisplayOptions {
+  /// Whether the running screen shows the observation result.
+  var showsObservedCount = true
 }
