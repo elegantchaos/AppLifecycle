@@ -27,3 +27,13 @@ The package's string catalog and `defaultLocalization` are gone. The default vie
 ## Validation
 
 `agt validate --target Application` passed with the new suite, and `agt format` found nothing in 36 files. TestApplication built for macOS. `agt validate --full --platforms watchOS --test-platforms macOS` at `846d6fb` built the package for watchOS and passed the macOS tests. The watchOS build was not run on a device or simulator, and the full validation across every platform has not run.
+
+## Follow-up: Synchronous Construction
+
+The preparing builder was the wrong fix. It gave apps a second loading view with no startup context, which sidesteps the design: the startup view, with the runtime's early services, is meant to be each run's first screen. The gap it covered came from the lifecycle itself, which published `.preparing` and ran the factory one main-actor hop later.
+
+The factory now runs synchronously inside `launch()` and `startRunning()`, and the lifecycle publishes `.starting(context)` or the factory's failure before returning. The `.preparing` phase and the `preparing:` builder are gone. The trade-off is that a slow factory delays the first frame instead of showing a spinner; the factory's contract already requires it to be cheap, with slow work in `startup()`.
+
+While the factory runs, the published phase still describes the state before it, so a private construction flag rejects lifecycle requests made from inside the factory. Tests cover immediate publication of the startup context, synchronous factory failure, and a factory that calls `launch()`, `startRunning()` and `enterConfiguration()`. The first two failed before the change. The re-entry test passed on the old code, where `.preparing` acted as the guard. With the new guard disabled, it overflowed the stack and crashed the run.
+
+`agt validate --target Application` passed, `agt format` found nothing, and TestApplication built for macOS with its catalog resynced.

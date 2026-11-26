@@ -39,6 +39,13 @@ public final class AppLifecycle<Runtime: AppRuntime> {
   /// Keeps a partially stopped runtime available for another shutdown attempt.
   @ObservationIgnored private var pendingShutdown: Runtime?
 
+  /// Whether the runtime factory is running.
+  ///
+  /// The factory runs synchronously inside a request, while the published
+  /// phase still describes the state before it. Requests made from inside the
+  /// factory are rejected rather than constructing or leaving a second runtime.
+  @ObservationIgnored private var isConstructing = false
+
   /// Requests from `runningRuntime()` waiting for the next phase change, by request.
   @ObservationIgnored private var phaseWaiters: [UUID: CheckedContinuation<Void, any Error>] = [:]
 
@@ -47,8 +54,11 @@ public final class AppLifecycle<Runtime: AppRuntime> {
 
   /// Creates a lifecycle without constructing a runtime.
   ///
-  /// Keep the factory cheap. Defer opening resources and doing asynchronous work
-  /// to `AppRuntime.startup()`. If the factory throws, it must clean up anything
+  /// The factory runs synchronously inside `launch()` and `startRunning()`, and
+  /// the first frame of each run waits for it. Keep it cheap: construct services
+  /// and return early dependencies, and defer opening resources and other slow
+  /// or asynchronous work to `AppRuntime.startup()`. The factory must not call
+  /// back into the lifecycle; such requests are ignored. If the factory throws, it must clean up anything
   /// it acquired before throwing.
   public init(makeRuntime: @escaping @MainActor () throws -> Runtime) {
     self.makeRuntime = makeRuntime
@@ -79,7 +89,7 @@ public final class AppLifecycle<Runtime: AppRuntime> {
           throw failure.error
         case .configuration:
           throw AppLifecycleError.configurationMode
-        case .idle, .preparing, .starting, .shuttingDown:
+        case .idle, .starting, .shuttingDown:
           try await nextPublication()
       }
     }
@@ -87,7 +97,7 @@ public final class AppLifecycle<Runtime: AppRuntime> {
 
   /// Launches once. Choosing configuration mode leaves the runtime factory untouched.
   public func launch(in mode: LaunchMode = .normal) {
-    guard case .idle = committedPhase else { return }
+    guard !isConstructing, case .idle = committedPhase else { return }
 
     switch mode {
       case .normal:
@@ -99,6 +109,8 @@ public final class AppLifecycle<Runtime: AppRuntime> {
 
   /// Starts a fresh runtime from configuration mode or retries a failed startup.
   public func startRunning() {
+    guard !isConstructing else { return }
+
     switch committedPhase {
       case .configuration, .failed(.startup):
         beginStartup()
@@ -113,6 +125,8 @@ public final class AppLifecycle<Runtime: AppRuntime> {
   /// shutdown. A command handled by the old runtime can submit the request and
   /// return, allowing shutdown to drain the runtime's outstanding work.
   public func enterConfiguration() {
+    guard !isConstructing else { return }
+
     switch committedPhase {
       case .running(let runtime, _):
         beginShutdown(of: runtime, startupError: nil)
@@ -125,24 +139,29 @@ public final class AppLifecycle<Runtime: AppRuntime> {
 
   /// Retries shutdown on the same runtime after a failed shutdown.
   public func retryShutdown() {
-    guard case .failed(.shutdown(_, let startupError)) = committedPhase, let pendingShutdown else { return }
+    guard !isConstructing, case .failed(.shutdown(_, let startupError)) = committedPhase, let pendingShutdown
+    else { return }
 
     beginShutdown(of: pendingShutdown, startupError: startupError)
   }
 
-  /// Schedules runtime creation, then publishes its early context before loading.
+  /// Constructs a runtime, publishes its early context, then schedules its asynchronous startup.
+  ///
+  /// The factory runs before this returns, so the startup view, with the
+  /// runtime's early services, is the first view an app shows for each run.
   private func beginStartup() {
-    publish(.preparing)
-    transitionTask = Task {
-      let runtime: Runtime
-      do {
-        runtime = try makeRuntime()
-      } catch {
-        completeTransition(in: .failed(.startup(error)))
-        return
-      }
+    let runtime: Runtime
+    do {
+      isConstructing = true
+      defer { isConstructing = false }
+      runtime = try makeRuntime()
+    } catch {
+      publish(.failed(.startup(error)))
+      return
+    }
 
-      publish(.starting(runtime.startupContext))
+    publish(.starting(runtime.startupContext))
+    transitionTask = Task {
       do {
         try await runtime.startup()
         completeTransition(in: .running(runtime, id: UUID()))
@@ -245,11 +264,8 @@ public final class AppLifecycle<Runtime: AppRuntime> {
 
   /// Determines which environment the application can present.
   public enum Phase {
-    /// The host has yet to choose how to launch.
+    /// The host has yet to launch; launching constructs the runtime before returning.
     case idle
-
-    /// The runtime factory is queued or constructing the runtime.
-    case preparing
 
     /// Early dependencies are ready while the remainder of the runtime starts.
     case starting(Runtime.StartupContext)

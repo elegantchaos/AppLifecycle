@@ -27,16 +27,15 @@ import SwiftUI
 
   /// Presents each phase with the environment available at that point.
   ///
-  /// The preparing builder covers launch and runtime construction, before any
-  /// startup context exists. Use the startup context for early environment values
+  /// Launch constructs the runtime before returning, so the startup view is the
+  /// first view an app shows for each run. Use the startup context for early environment values
   /// and the started runtime for the full running environment. The running view
   /// gets a fresh identity for each run. The configuration builder receives a
   /// start action. The failure builder receives the appropriate retry action for
   /// the failed operation. Omitted builders use the package's text-free views.
   @ViewBuilder
-  func rootView<Running: View, Preparing: View, Startup: View, Configuration: View, Shutdown: View, Failed: View>(
+  func rootView<Running: View, Startup: View, Configuration: View, Shutdown: View, Failed: View>(
     @ViewBuilder running: (Runtime) -> Running,
-    @ViewBuilder preparing: () -> Preparing = { DefaultProgressView() },
     @ViewBuilder startup: (Runtime.StartupContext) -> Startup,
     @ViewBuilder configuration: (@escaping @MainActor () -> Void) -> Configuration = { start in
       DefaultConfigurationView(start: start)
@@ -47,8 +46,8 @@ import SwiftUI
     }
   ) -> some View {
     switch phase {
-      case .idle, .preparing:
-        preparing()
+      case .idle:
+        DefaultProgressView()
       case .starting(let context):
         startup(context)
       case .running(let runtime, let id):

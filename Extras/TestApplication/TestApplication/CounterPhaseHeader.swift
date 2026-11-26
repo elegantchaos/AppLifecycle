@@ -31,7 +31,7 @@ struct CounterPhaseHeader: View {
   /// The short name of the phase.
   private var title: LocalizedStringResource {
     switch phase {
-      case .idle, .preparing: "Preparing"
+      case .idle: "Launching"
       case .starting: "Starting"
       case .running: "Running"
       case .shuttingDown: "Shutting Down"
@@ -44,7 +44,7 @@ struct CounterPhaseHeader: View {
   /// The symbol shown beside the phase name.
   private var symbol: String {
     switch phase {
-      case .idle, .preparing: "clock"
+      case .idle: "clock"
       case .starting: "arrow.clockwise"
       case .running: "checkmark.circle"
       case .shuttingDown: "stop.circle"
@@ -56,8 +56,8 @@ struct CounterPhaseHeader: View {
   /// What someone using the demo can do in this phase.
   private var detail: LocalizedStringResource {
     switch phase {
-      case .idle, .preparing:
-        "Creating the services that are ready to use during startup."
+      case .idle:
+        "The app has not launched yet."
       case .starting:
         "The display settings are ready while the counter loads its storage."
       case .running:

@@ -58,7 +58,7 @@ struct AppLifecycleTests {
     }
 
     lifecycle.launch()
-    #expect(creations == 0)
+    #expect(creations == 1)
     let startup = try #require(lifecycle.transitionTask)
     await start.next()
     defer { complete.finish() }
@@ -241,6 +241,48 @@ struct AppLifecycleTests {
     }
   }
 
+  /// Launch constructs the runtime before returning, so the startup view is the first view with app services.
+  @Test
+  func launchPublishesStartupContextImmediately() {
+    var creations = 0
+    let lifecycle = AppLifecycle {
+      creations += 1
+      return LifecycleTestRuntime(configuration: 0)
+    }
+
+    lifecycle.launch()
+
+    #expect(creations == 1)
+    guard case .starting = lifecycle.phase else {
+      Issue.record("Expected the startup context as soon as launch returns")
+      return
+    }
+  }
+
+  /// A factory that calls back into the lifecycle cannot start a second runtime or leave the first.
+  @Test
+  func factoryCannotReenterTheLifecycle() async {
+    var creations = 0
+    var lifecycle: AppLifecycle<LifecycleTestRuntime>?
+    lifecycle = AppLifecycle {
+      creations += 1
+      lifecycle?.launch()
+      lifecycle?.startRunning()
+      lifecycle?.enterConfiguration()
+      return LifecycleTestRuntime(configuration: creations)
+    }
+    defer { lifecycle = nil }
+
+    lifecycle?.launch()
+    await lifecycle?.transitionTask?.value
+
+    #expect(creations == 1)
+    guard case .running = lifecycle?.phase else {
+      Issue.record("Expected the one constructed runtime to run")
+      return
+    }
+  }
+
   /// A factory failure can be retried without shutting down a runtime.
   @Test
   func failedFactoryCanRetryStartup() async throws {
@@ -252,13 +294,12 @@ struct AppLifecycleTests {
     }
 
     lifecycle.launch()
-    let startup = try #require(lifecycle.transitionTask)
-    await startup.value
     guard case .failed(.startup(let error)) = lifecycle.phase else {
-      Issue.record("Expected the runtime factory failure")
+      Issue.record("Expected the runtime factory failure as soon as launch returns")
       return
     }
     #expect(error as? LifecycleTestRuntime.Failure == .startup)
+    #expect(lifecycle.transitionTask == nil)
 
     lifecycle.startRunning()
     let retry = try #require(lifecycle.transitionTask)
@@ -443,7 +484,6 @@ struct AppLifecycleTests {
     #expect(runtime.didStart)
     _ = lifecycle.rootView(
       running: { _ in Text("Ready") },
-      preparing: { Text("Preparing") },
       startup: { _ in Text("Starting") }
     )
 

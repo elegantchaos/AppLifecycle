@@ -5,7 +5,7 @@
 - [Full Review of Application](2026-11-26-full-review-application.md) reviews the lifecycle and monitoring APIs and records the reproduced ownership defects.
 - [Proposed Maintenance Lifecycle](2026-11-26-maintenance-lifecycle.md) records the lifecycle investigation, the per-run runtime API, and the standalone counter demo.
 - [Full Review Fixes and Stack Adoption](2026-11-26-review-fixes.md) fixes the review's findings, including an Observation re-entry crash, and lists the library gaps that stop Stack adopting the lifecycle.
-- [Stack Adoption Support](2026-11-26-stack-adoption-support.md) closes those gaps with an async runtime accessor, watchOS support and a preparing-phase view, and removes the package's user-facing text.
+- [Stack Adoption Support](2026-11-26-stack-adoption-support.md) closes those gaps with an async runtime accessor and watchOS support, makes runtime construction synchronous so the startup view is each run's first screen, and removes the package's user-facing text.
 
 ## 2026-10-27
 

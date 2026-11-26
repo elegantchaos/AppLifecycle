@@ -19,9 +19,6 @@
     "Counter Lifecycle" : {
 
     },
-    "Creating the services that are ready to use during startup." : {
-
-    },
     "Display Settings" : {
 
     },
@@ -34,6 +31,9 @@
     "Last Closed Storage" : {
 
     },
+    "Launching" : {
+
+    },
     "Next count set to 10" : {
 
     },
@@ -41,9 +41,6 @@
 
     },
     "Opening storage…" : {
-
-    },
-    "Preparing" : {
 
     },
     "Retry Shutdown" : {
@@ -98,6 +95,9 @@
 
     },
     "Temporary" : {
+
+    },
+    "The app has not launched yet." : {
 
     },
     "The app shuts down the current counter before opening Configuration." : {
