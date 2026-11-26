@@ -1,6 +1,6 @@
 # Project Specific Rules
 
-- This package provides shared app-level orchestration, lifecycle support, state modeling, and change monitoring for SwiftUI applications.
+- This package coordinates the lifecycle of SwiftUI applications: launch, asynchronous startup, configuration mode and in-process restart of a per-run runtime. Change monitoring lives in the separate ChangeMonitoring package.
 - Target macOS 26.0+, iOS 26.0+, tvOS 26.0+, and watchOS 26.0+.
 - The codebase uses Swift 6.2 with modern concurrency.
 - Regular package targets default to `MainActor` isolation. Keep executor assumptions explicit and avoid accidental cross-actor access.

@@ -3,7 +3,7 @@
 //  Copyright © 2026 Elegant Chaos Limited. All rights reserved.
 // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-import Application
+import AppLifecycle
 import SwiftUI
 
 /// Names the current lifecycle phase and explains what is available in it.

@@ -3,7 +3,7 @@
 //  Copyright © 2026 Elegant Chaos Limited. All rights reserved.
 // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-@testable import Application
+@testable import AppLifecycle
 
 /// Runs test-controlled startup and shutdown work with a fixed configuration.
 @MainActor

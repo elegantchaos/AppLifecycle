@@ -8,7 +8,7 @@ import Observation
 import SwiftUI
 import Testing
 
-@testable import Application
+@testable import AppLifecycle
 
 /// Exercises the application lifecycle through its phase and runtime contracts.
 @MainActor

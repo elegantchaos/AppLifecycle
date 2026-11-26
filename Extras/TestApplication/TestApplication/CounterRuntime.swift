@@ -3,7 +3,7 @@
 //  Copyright © 2026 Elegant Chaos Limited. All rights reserved.
 // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-import Application
+import AppLifecycle
 import SwiftUI
 
 /// Owns the counter and its observation for one normal run of the demo.
@@ -43,7 +43,7 @@ final class CounterRuntime: AppRuntime {
   /// Closes the counter and stops observation before configuration mode is shown.
   func shutdown() async throws {
     counter.close()
-    mirror.stopObserving()
+    await mirror.stopObserving()
     if configuration.slowsTransitions {
       try await Task.sleep(for: .seconds(2))
     }

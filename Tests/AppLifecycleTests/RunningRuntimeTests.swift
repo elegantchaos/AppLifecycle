@@ -5,7 +5,7 @@
 
 import Testing
 
-@testable import Application
+@testable import AppLifecycle
 
 /// Checks how code outside the view tree waits for a running runtime.
 @MainActor

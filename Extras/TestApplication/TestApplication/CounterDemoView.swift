@@ -3,7 +3,7 @@
 //  Copyright © 2026 Elegant Chaos Limited. All rights reserved.
 // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-import Application
+import AppLifecycle
 import SwiftUI
 
 /// Keeps the lifecycle status visible while the counter's phase-specific content changes.

@@ -1,6 +1,6 @@
-# Application
+# AppLifecycle
 
-`Application` is a Swift package for coordinating SwiftUI app lifecycles and monitoring changes.
+`AppLifecycle` is a Swift package for coordinating the lifecycle of a SwiftUI app: launch, startup, configuration and in-process restart. For cancellable monitoring of Observation values, notifications and preferences, see [ChangeMonitoring](https://github.com/elegantchaos/ChangeMonitoring).
 
 ## Lifecycle
 
@@ -19,7 +19,7 @@ Keep one `AppLifecycle` at the app root. It coordinates launch and transitions. 
 A small app can supply just the runtime and the running view:
 
 ```swift
-import Application
+import AppLifecycle
 import SwiftUI
 
 @MainActor
@@ -49,29 +49,33 @@ Implement `startup()` if there is work to finish before showing the running view
 
 Leaving the running phase removes the runtime from the view hierarchy. The running view gets a fresh identity for each run, so its `task` modifiers and other view-owned work end with it. That does not end work the runtime's services own, or work started outside the running view, such as a command, a menu item, a notification observer or an App Intent. `shutdown()` is where that work stops: stop accepting new work, cancel or drain outstanding tasks and await them, then release resources. It also runs after a partial startup, so it must cope with services that never opened.
 
-For example, a runtime that observes another service keeps the token and drops it during shutdown:
+For example, a runtime that follows another service's state and refreshes periodically owns both tasks, and cancels and awaits them during shutdown:
 
 ```swift
 @MainActor
 final class LibraryRuntime: AppRuntime {
   let store: LibraryStore
   private var refreshTask: Task<Void, Never>?
-  private var syncObservation: ObservationToken?
+  private var syncTask: Task<Void, Never>?
 
   init(store: LibraryStore) { self.store = store }
 
   func startup() async throws {
     try await store.open()
-    syncObservation = onChange(of: store.syncState) { [weak self] state in
-      self?.syncStateChanged(state)
+    syncTask = Task { [weak self, store] in
+      for await state in Observations({ store.syncState }) {
+        self?.syncStateChanged(state)
+      }
     }
     refreshTask = Task { [store] in await store.refreshPeriodically() }
   }
 
   func shutdown() async throws {
-    syncObservation = nil
-    refreshTask?.cancel()
-    await refreshTask?.value
+    for task in [syncTask, refreshTask] {
+      task?.cancel()
+      await task?.value
+    }
+    syncTask = nil
     refreshTask = nil
     try await store.close()
   }
@@ -105,23 +109,14 @@ The [TestApplication Xcode project](Extras/TestApplication/TestApplication.xcode
 
 ### Migrating from Application 1.x
 
+This package was previously called `Application`. Depend on `AppLifecycle` and replace `import Application` with `import AppLifecycle`.
+
+
 1. Make the old engine's service graph an `AppRuntime`. Move cheap initialization into its initializer or factory, return early services from `startupContext`, and load the remaining services in `startup()`. Implement `shutdown()` so it can clean up a partially started runtime and retry after a teardown failure. A runtime that genuinely owns no work conforms to `AppRuntimeWithoutTeardown` instead; there is no silent default.
 2. Keep one `AppLifecycle` at the app root and supply a factory that creates a fresh runtime. Replace `standardLoop()` with `launch()` and use `lifecycle.phase` in place of the old engine state and startup task.
 3. Apply the old startup and running injectors inside the corresponding `rootView` builders. Use the same phase to gate other windows, settings, and commands that depend on the running services.
 4. Give the failure view actions appropriate to the failed operation. After startup fails and cleanup succeeds, `startRunning()` retries with a fresh instance. If teardown itself fails, `retryShutdown()` finishes cleanup on the same instance. Handle errors from ordinary running commands in the app's own error presentation.
-5. Store every `ObservationToken` that `onChange(of:perform:)` returns. In 1.x a discarded token kept observing; it now stops observing as soon as it is released, and the result is no longer discardable, so the compiler flags calls that ignore it. A token stored in a property and overwritten on reconnect now cancels the previous observation.
-
-## Notifications and Observation
-
-### Notifications
-
-`NotificationCenter.onNotification(named:object:perform:)` and `UserDefaults.onChange(initial:_:)` return a `NotificationToken`. Retain the token while monitoring is wanted. Cancelling or dropping it removes the observer. Pass `initial: true` to the defaults helper to call the handler immediately.
-
-The defaults helper reports writes made through the observed `UserDefaults` instance in the current process. A write through another instance, even one opened for the same suite, is readable through the observed instance but produces no callback, and writes from other processes are not reported. Share one instance between the code that writes a setting and the code that observes it.
-
-### Observation
-
-`onChange(of:perform:)` tracks a main-actor Observation value and delivers its latest value on the main actor. Mutations before delivery can coalesce, and mutations inside the callback precede the next tracking pass. The returned `ObservationToken` owns the observation: store it with the object whose lifetime the observation should follow. Releasing the token, or calling `cancel()`, stops delivery and releases the callback and value reader, together with anything they capture.
+5. The change-monitoring helpers, `onChange(of:perform:)`, `onNotification(named:object:perform:)`, `UserDefaults.onChange(initial:_:)` and their tokens, moved to [ChangeMonitoring](https://github.com/elegantchaos/ChangeMonitoring). Depend on that package where they are used; its README covers the change in observation-token ownership.
 
 ## Project records
 
