@@ -20,7 +20,7 @@ struct CounterView: View {
   var body: some View {
     GroupBox("Counter") {
       VStack(alignment: .leading, spacing: 12) {
-        LabeledContent("Active Storage", value: counter.backend.title)
+        LabeledContent("Active Storage") { Text(counter.backend.title) }
         LabeledContent("Count", value: counter.value.formatted())
         if options.showsObservedCount {
           LabeledContent("Observed Count", value: mirror.value.formatted())

@@ -10,6 +10,7 @@ import PackageDescription
 /// Shared application orchestration and its regression tests.
 let package = Package(
   name: "Application",
+  defaultLocalization: "en",
 
   platforms: [
     .macOS("26.0"), .iOS("26.0"), .tvOS("26.0"),
@@ -24,7 +25,8 @@ let package = Package(
 
   targets: [
     .target(
-      name: "Application"
+      name: "Application",
+      resources: [.process("Resources")]
     ),
     .testTarget(
       name: "ApplicationTests",

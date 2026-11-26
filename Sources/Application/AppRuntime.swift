@@ -5,12 +5,16 @@
 
 /// Owns the services and state for one normal run of an application.
 ///
-/// Implement the startup or shutdown hooks when the runtime needs them. A
-/// nonthrowing implementation can omit `throws`.
+/// Implement `startup()` when the runtime has work to finish before the running
+/// environment appears. Every runtime declares its teardown: implement
+/// `shutdown()` to stop the work and release the resources it owns, or conform
+/// to `AppRuntimeWithoutTeardown` when it owns none. Nonthrowing implementations
+/// can omit `throws`.
 ///
 /// The lifecycle calls startup once per instance and makes the runtime available
-/// to the running environment only on success. The application chooses how its
-/// services are constructed and which ones need explicit teardown.
+/// to the running environment only on success. It calls shutdown before
+/// configuration mode, and after a startup failure before a retry can construct
+/// another runtime.
 @MainActor public protocol AppRuntime: AnyObject {
   /// The services and state that are ready as soon as the runtime is constructed.
   associatedtype StartupContext = Void
@@ -37,7 +41,4 @@
 @MainActor public extension AppRuntime {
   /// Completes startup immediately for runtimes with no additional work.
   func startup() async throws {}
-
-  /// Completes shutdown for runtimes with no outstanding work or resources to release.
-  func shutdown() async throws {}
 }

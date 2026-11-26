@@ -5,9 +5,10 @@
 
 /// Owns the value reader and callback for an installed observation loop.
 ///
-/// Call `cancel()` to stop delivery and immediately release captured resources.
-/// Installed observation keeps the token alive, so discarding the returned token
-/// leaves monitoring active. Retain it when explicit cancellation is needed.
+/// The caller's reference is the only one that keeps observation alive. Store
+/// the token with the object whose lifetime the observation should follow.
+/// Releasing it, or calling `cancel()`, stops delivery and releases the value
+/// reader and callback, together with anything they capture.
 @MainActor
 public final class ObservationToken {
   /// Whether this token has permanently stopped monitoring.
@@ -28,9 +29,6 @@ public final class ObservationToken {
     observation = nil
     handler = nil
   }
-
-  /// Returns whether the token has been cancelled.
-  var cancelled: Bool { isCancelled }
 
   /// Takes ownership of the callbacks and installs the first tracking pass.
   func install(

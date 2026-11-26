@@ -14,7 +14,7 @@ import SwiftUI
   func rootView<Running: View, Configuration: View>(
     @ViewBuilder running: (Runtime) -> Running,
     @ViewBuilder configuration: (@escaping @MainActor () -> Void) -> Configuration = { start in
-      Button("Start App", action: start)
+      DefaultConfigurationView(start: start)
     }
   ) -> some View {
     rootView(
@@ -35,15 +35,11 @@ import SwiftUI
     @ViewBuilder running: (Runtime) -> Running,
     @ViewBuilder startup: (Runtime.StartupContext) -> Startup,
     @ViewBuilder configuration: (@escaping @MainActor () -> Void) -> Configuration = { start in
-      Button("Start App", action: start)
+      DefaultConfigurationView(start: start)
     },
-    @ViewBuilder shutdown: () -> Shutdown = { ProgressView("Shutting Down…") },
-    @ViewBuilder failure: (AppLifecycleFailure, @escaping @MainActor () -> Void) -> Failed = {
-      failure, retry in
-      VStack {
-        Text(failure.error.localizedDescription)
-        Button("Retry", action: retry)
-      }
+    @ViewBuilder shutdown: () -> Shutdown = { DefaultShutdownView() },
+    @ViewBuilder failure: (AppLifecycleFailure, @escaping @MainActor () -> Void) -> Failed = { failure, retry in
+      DefaultFailureView(failure: failure, retry: retry)
     }
   ) -> some View {
     switch phase {

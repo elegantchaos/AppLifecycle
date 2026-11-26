@@ -41,6 +41,30 @@ struct ObservationLifetimeTests {
     #expect(releasedSource == nil)
   }
 
+  /// Dropping the token releases it, its callback, and the observed source without a later mutation.
+  @Test
+  func droppingTokenReleasesResources() throws {
+    var source: ObservableValue? = ObservableValue()
+    var owner: ObservableValue? = ObservableValue()
+    weak let releasedSource = source
+    weak let releasedOwner = owner
+    var token: ObservationToken? = observe(try #require(source), retaining: try #require(owner))
+    weak let releasedToken = token
+    source = nil
+    owner = nil
+    #expect(releasedToken != nil)
+
+    token = nil
+    #expect(releasedToken == nil)
+    #expect(releasedSource == nil)
+    #expect(releasedOwner == nil)
+  }
+
+  /// Observes the source with a callback that keeps the owner alive.
+  private func observe(_ source: ObservableValue, retaining owner: ObservableValue) -> ObservationToken {
+    onChange(of: source.value) { value in owner.value = value }
+  }
+
   /// Captures the source by value so only the observation keeps it alive.
   private func observe(_ source: ObservableValue) -> ObservationToken {
     onChange(of: source.value) { _ in }

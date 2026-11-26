@@ -13,11 +13,25 @@ import Observation
 /// early context while the rest of the runtime loads. The full runtime becomes
 /// available after startup succeeds. Configuration mode begins once the previous
 /// runtime has acknowledged shutdown.
+///
+/// Observers of `phase` can request transitions while they are being notified.
+/// Such a request sees the phase being published and is checked against it, and
+/// any phase it moves to is published once the current notification finishes.
 @MainActor
 @Observable
 public final class AppLifecycle<Runtime: AppRuntime> {
-  /// The phase presented by the host, including the runtime only while running.
-  public private(set) var phase: Phase = .idle
+  /// The authoritative phase, committed before observers are notified.
+  ///
+  /// Observation notifies observers before a stored property changes, so a
+  /// transition guarded by an observed stored phase would let an observer
+  /// start the same transition again.
+  @ObservationIgnored private var committedPhase: Phase = .idle
+
+  /// Whether observers are being notified of a phase change.
+  @ObservationIgnored private var isPublishing = false
+
+  /// Whether an observer committed a further phase during the current notification.
+  @ObservationIgnored private var hasUnpublishedPhase = false
 
   /// Creates a fresh runtime without starting it.
   private let makeRuntime: @MainActor () throws -> Runtime
@@ -37,21 +51,27 @@ public final class AppLifecycle<Runtime: AppRuntime> {
     self.makeRuntime = makeRuntime
   }
 
+  /// The phase presented by the host, including the runtime only while running.
+  public var phase: Phase {
+    access(keyPath: \.phase)
+    return committedPhase
+  }
+
   /// Launches once. Choosing configuration mode leaves the runtime factory untouched.
   public func launch(in mode: LaunchMode = .normal) {
-    guard case .idle = phase else { return }
+    guard case .idle = committedPhase else { return }
 
     switch mode {
       case .normal:
         beginStartup()
       case .configuration:
-        phase = .configuration
+        publish(.configuration)
     }
   }
 
   /// Starts a fresh runtime from configuration mode or retries a failed startup.
   public func startRunning() {
-    switch phase {
+    switch committedPhase {
       case .configuration, .failed(.startup):
         beginStartup()
       default:
@@ -65,11 +85,11 @@ public final class AppLifecycle<Runtime: AppRuntime> {
   /// shutdown. A command handled by the old runtime can submit the request and
   /// return, allowing shutdown to drain the runtime's outstanding work.
   public func enterConfiguration() {
-    switch phase {
+    switch committedPhase {
       case .running(let runtime, _):
         beginShutdown(of: runtime, startupError: nil)
       case .failed(.startup):
-        phase = .configuration
+        publish(.configuration)
       default:
         break
     }
@@ -77,14 +97,14 @@ public final class AppLifecycle<Runtime: AppRuntime> {
 
   /// Retries shutdown on the same runtime after a failed shutdown.
   public func retryShutdown() {
-    guard case .failed(.shutdown(_, let startupError)) = phase, let pendingShutdown else { return }
+    guard case .failed(.shutdown(_, let startupError)) = committedPhase, let pendingShutdown else { return }
 
     beginShutdown(of: pendingShutdown, startupError: startupError)
   }
 
   /// Schedules runtime creation, then publishes its early context before loading.
   private func beginStartup() {
-    phase = .preparing
+    publish(.preparing)
     transitionTask = Task {
       let runtime: Runtime
       do {
@@ -94,12 +114,12 @@ public final class AppLifecycle<Runtime: AppRuntime> {
         return
       }
 
-      phase = .starting(runtime.startupContext)
+      publish(.starting(runtime.startupContext))
       do {
         try await runtime.startup()
         completeTransition(in: .running(runtime, id: UUID()))
       } catch {
-        phase = .shuttingDown
+        publish(.shuttingDown)
         await finishShutdown(of: runtime, startupError: error)
       }
     }
@@ -107,7 +127,7 @@ public final class AppLifecycle<Runtime: AppRuntime> {
 
   /// Withdraws the running environment and schedules shutdown.
   private func beginShutdown(of runtime: Runtime, startupError: (any Error)?) {
-    phase = .shuttingDown
+    publish(.shuttingDown)
     transitionTask = Task {
       await finishShutdown(of: runtime, startupError: startupError)
     }
@@ -132,7 +152,27 @@ public final class AppLifecycle<Runtime: AppRuntime> {
   /// Clears completed work before exposing a phase that accepts another transition.
   private func completeTransition(in nextPhase: Phase) {
     transitionTask = nil
-    phase = nextPhase
+    publish(nextPhase)
+  }
+
+  /// Commits a phase, then notifies observers unless a notification is already in progress.
+  ///
+  /// Observation does not support mutating a property from inside its own
+  /// change notification, so a phase committed by an observer is published by
+  /// the outer call after the current notification returns.
+  private func publish(_ nextPhase: Phase) {
+    committedPhase = nextPhase
+    guard !isPublishing else {
+      hasUnpublishedPhase = true
+      return
+    }
+
+    isPublishing = true
+    defer { isPublishing = false }
+    repeat {
+      hasUnpublishedPhase = false
+      withMutation(keyPath: \.phase) {}
+    } while hasUnpublishedPhase
   }
 
   /// Selects the application's initial destination.

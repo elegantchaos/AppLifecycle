@@ -4,6 +4,7 @@
 
 - [Full Review of Application](2026-11-26-full-review-application.md) reviews the lifecycle and monitoring APIs and records the reproduced ownership defects.
 - [Proposed Maintenance Lifecycle](2026-11-26-maintenance-lifecycle.md) records the lifecycle investigation, the per-run runtime API, and the standalone counter demo.
+- [Full Review Fixes and Stack Adoption](2026-11-26-review-fixes.md) fixes the review's findings, including an Observation re-entry crash, and lists the library gaps that stop Stack adopting the lifecycle.
 
 ## 2026-10-27
 

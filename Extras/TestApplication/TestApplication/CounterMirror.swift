@@ -13,13 +13,8 @@ final class CounterMirror {
   /// Most recently observed count.
   private(set) var value = 0
 
-  /// Observation owned by this run.
+  /// Observation owned by this run; releasing the mirror ends it.
   @ObservationIgnored private var observation: ObservationToken?
-
-  /// Releases observation if the mirror is discarded by a preview.
-  isolated deinit {
-    observation?.cancel()
-  }
 
   /// Tracks the counter after its stored value has loaded.
   func startObserving(_ counter: CounterService) {

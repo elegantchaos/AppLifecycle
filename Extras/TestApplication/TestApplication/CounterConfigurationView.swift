@@ -20,7 +20,7 @@ struct CounterConfigurationView: View {
     GroupBox("Storage for Next Run") {
       VStack(alignment: .leading, spacing: 10) {
         if let closed = configuration.lastClosedBackend {
-          LabeledContent("Last Closed Storage", value: closed.title)
+          LabeledContent("Last Closed Storage") { Text(closed.title) }
         }
         Picker("Storage", selection: $configuration.backend) {
           ForEach(CounterBackend.allCases, id: \.self) { backend in

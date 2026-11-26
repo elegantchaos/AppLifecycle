@@ -64,4 +64,23 @@ struct NotificationTests {
     NotificationCenter.default.post(name: UserDefaults.didChangeNotification, object: defaults)
     #expect(calls == (initial ? 2 : 1))
   }
+
+  /// Writes through the observed instance are reported; writes through another instance of the same suite are not.
+  @Test
+  func defaultsReportWritesThroughTheObservedInstance() throws {
+    let suite = "ApplicationTests.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suite))
+    let otherInstance = try #require(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    var calls = 0
+    let token = defaults.onChange { _ in calls += 1 }
+    defer { token.cancel() }
+
+    otherInstance.set(1, forKey: "value")
+    #expect(defaults.integer(forKey: "value") == 1)
+    #expect(calls == 0)
+
+    defaults.set(2, forKey: "value")
+    #expect(calls == 1)
+  }
 }

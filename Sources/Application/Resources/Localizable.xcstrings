@@ -1,0 +1,15 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Retry" : {
+      "comment" : "Retries the lifecycle operation that failed."
+    },
+    "Shutting Down…" : {
+      "comment" : "Progress label while the running app releases its resources."
+    },
+    "Start App" : {
+      "comment" : "Starts a fresh runtime from configuration mode."
+    }
+  },
+  "version" : "1.0"
+}

@@ -4,6 +4,7 @@
 // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 import Foundation
+import Observation
 import SwiftUI
 import Testing
 
@@ -326,7 +327,82 @@ struct AppLifecycleTests {
     #expect(creations == 2)
   }
 
-  /// A runtime can use the default hooks and present just a running view.
+  /// A phase observer that requests launch again while launch is publishing cannot start a second runtime.
+  @Test(arguments: [false, true])
+  func launchRejectsObserverReentry(intoConfiguration: Bool) async {
+    var creations = 0
+    let lifecycle = AppLifecycle {
+      creations += 1
+      return LifecycleTestRuntime(configuration: 0)
+    }
+    let reentry = onNextPhaseChange(of: lifecycle) { $0.launch() }
+
+    lifecycle.launch(in: intoConfiguration ? .configuration : .normal)
+    await reentry.transitionTask?.value
+    await lifecycle.transitionTask?.value
+
+    #expect(reentry.didRun)
+    #expect(creations == (intoConfiguration ? 0 : 1))
+  }
+
+  /// A phase observer that requests configuration again while shutdown is publishing cannot run teardown twice.
+  @Test
+  func shutdownRejectsObserverReentry() async throws {
+    var shutdowns = 0
+    let lifecycle = AppLifecycle {
+      LifecycleTestRuntime(configuration: 0, onShutdown: { shutdowns += 1 })
+    }
+    lifecycle.launch()
+    await lifecycle.transitionTask?.value
+    let reentry = onNextPhaseChange(of: lifecycle) { $0.enterConfiguration() }
+
+    lifecycle.enterConfiguration()
+    await reentry.transitionTask?.value
+    await lifecycle.transitionTask?.value
+
+    #expect(reentry.didRun)
+    #expect(shutdowns == 1)
+    guard case .configuration = lifecycle.phase else {
+      Issue.record("Expected configuration mode after one shutdown")
+      return
+    }
+  }
+
+  /// A phase observer sees a completed transition and can act on it immediately.
+  @Test
+  func observerCanActOnCompletedStartup() async throws {
+    let (starts, started) = AsyncStream<Void>.makeStream()
+    let (completions, complete) = AsyncStream<Void>.makeStream()
+    defer { complete.finish() }
+    var start = starts.makeAsyncIterator()
+    var shutdowns = 0
+    let lifecycle = AppLifecycle {
+      LifecycleTestRuntime(
+        configuration: 0,
+        onStartup: {
+          started.yield(())
+          for await _ in completions { break }
+        },
+        onShutdown: { shutdowns += 1 })
+    }
+    lifecycle.launch()
+    let startup = try #require(lifecycle.transitionTask)
+    await start.next()
+    let reentry = onNextPhaseChange(of: lifecycle) { $0.enterConfiguration() }
+
+    complete.finish()
+    await startup.value
+    await reentry.transitionTask?.value
+
+    #expect(reentry.didRun)
+    #expect(shutdowns == 1)
+    guard case .configuration = lifecycle.phase else {
+      Issue.record("Expected the observer's configuration request to follow startup")
+      return
+    }
+  }
+
+  /// A runtime that declares it has no teardown can omit both hooks and present just a running view.
   @Test
   func runtimeWithNoAdditionalWork() async throws {
     let lifecycle = AppLifecycle { ImmediateRuntime() }
@@ -350,7 +426,7 @@ struct AppLifecycleTests {
   }
 
   /// A runtime whose services are ready immediately and have no cleanup.
-  private final class ImmediateRuntime: AppRuntime {}
+  private final class ImmediateRuntime: AppRuntimeWithoutTeardown {}
 
   /// Runs explicitly implemented hooks even when both operations are nonthrowing.
   @Test
@@ -392,5 +468,39 @@ struct AppLifecycleTests {
   private final class Configuration {
     /// The selection read by the runtime factory.
     var value = 1
+  }
+}
+
+extension AppLifecycleTests {
+  /// Runs a request from inside the next synchronous phase notification.
+  ///
+  /// Observation calls the handler while the phase is being published. The
+  /// returned record captures any transition the request scheduled, so tests
+  /// can wait for work that a re-entrant request might otherwise leave detached.
+  private func onNextPhaseChange(
+    of lifecycle: AppLifecycle<LifecycleTestRuntime>,
+    perform request: @escaping @MainActor (AppLifecycle<LifecycleTestRuntime>) -> Void
+  ) -> ObserverRequest {
+    let record = ObserverRequest()
+    withObservationTracking {
+      _ = lifecycle.phase
+    } onChange: {
+      MainActor.assumeIsolated {
+        request(lifecycle)
+        record.didRun = true
+        record.transitionTask = lifecycle.transitionTask
+      }
+    }
+    return record
+  }
+
+  /// The outcome of a request made from a phase observer.
+  @MainActor
+  private final class ObserverRequest {
+    /// Whether the observer ran.
+    var didRun = false
+
+    /// The lifecycle's transition immediately after the observer's request.
+    var transitionTask: Task<Void, Never>?
   }
 }

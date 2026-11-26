@@ -11,10 +11,10 @@ import Observation
 /// one callback. Mutations performed by the handler precede the next tracking
 /// pass and do not trigger an additional callback.
 ///
-/// Call `cancel()` on the returned token to stop delivery and release captured
-/// resources. Discarding the token leaves observation active. Both the value
+/// Retain the returned token for as long as delivery is wanted. Releasing the
+/// last reference, or calling `cancel()`, stops delivery and releases the value
+/// reader and callback, together with anything they capture. Both the value
 /// reader and callback run on the main actor.
-@discardableResult
 @MainActor
 public func onChange<Value>(
   of value: @escaping @autoclosure @MainActor @Sendable () -> Value,
@@ -26,11 +26,12 @@ public func onChange<Value>(
     guard let token else { return }
     withObservationTracking {
       _ = value()
-    } onChange: {
-      // Only the token is retained by Observation. Cancellation can therefore
-      // release the value reader and callback before another mutation arrives.
-      Task { @MainActor in
-        token.didChange()
+    } onChange: { [weak token] in
+      // Observation keeps this handler until the next mutation. Holding the
+      // token weakly leaves the caller's reference as the only owner, so
+      // dropping it releases the value reader and callback immediately.
+      Task { @MainActor [weak token] in
+        token?.didChange()
       }
     }
   } handler: {
