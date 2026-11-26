@@ -116,7 +116,7 @@ This package was previously called `Application`. Depend on `AppLifecycle` and r
 2. Keep one `AppLifecycle` at the app root and supply a factory that creates a fresh runtime. Replace `standardLoop()` with `launch()` and use `lifecycle.phase` in place of the old engine state and startup task.
 3. Apply the old startup and running injectors inside the corresponding `rootView` builders. Use the same phase to gate other windows, settings, and commands that depend on the running services.
 4. Give the failure view actions appropriate to the failed operation. After startup fails and cleanup succeeds, `startRunning()` retries with a fresh instance. If teardown itself fails, `retryShutdown()` finishes cleanup on the same instance. Handle errors from ordinary running commands in the app's own error presentation.
-5. The change-monitoring helpers, `onChange(of:perform:)`, `onNotification(named:object:perform:)`, `UserDefaults.onChange(initial:_:)` and their tokens, moved to [ChangeMonitoring](https://github.com/elegantchaos/ChangeMonitoring). Depend on that package where they are used; its README covers the change in observation-token ownership.
+5. The change-monitoring helpers, `onChange(of:perform:)`, `onNotification(named:object:perform:)`, `UserDefaults.onChange(initial:_:)` and their tokens, moved to [ChangeMonitoring](https://github.com/elegantchaos/ChangeMonitoring). Depend on that package where they are used, and store every `ObservationToken` that `onChange(of:perform:)` returns: in 1.x a discarded token kept observing, but it now stops as soon as it is released, and the compiler flags calls that ignore it.
 
 ## Project records
 
