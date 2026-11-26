@@ -42,8 +42,8 @@ public final class AppLifecycle<Runtime: AppRuntime> {
   /// Whether the runtime factory is running.
   ///
   /// The factory runs synchronously inside a request, while the published
-  /// phase still describes the state before it. Requests made from inside the
-  /// factory are rejected rather than constructing or leaving a second runtime.
+  /// phase still describes the state before it, so phase checks alone cannot
+  /// catch a request made from inside the factory.
   @ObservationIgnored private var isConstructing = false
 
   /// Requests from `runningRuntime()` waiting for the next phase change, by request.
@@ -58,7 +58,8 @@ public final class AppLifecycle<Runtime: AppRuntime> {
   /// the first frame of each run waits for it. Keep it cheap: construct services
   /// and return early dependencies, and defer opening resources and other slow
   /// or asynchronous work to `AppRuntime.startup()`. The factory must not call
-  /// back into the lifecycle; such requests are ignored. If the factory throws, it must clean up anything
+  /// back into the lifecycle: debug builds stop at such a call, and release
+  /// builds ignore it. If the factory throws, it must clean up anything
   /// it acquired before throwing.
   public init(makeRuntime: @escaping @MainActor () throws -> Runtime) {
     self.makeRuntime = makeRuntime
@@ -96,8 +97,10 @@ public final class AppLifecycle<Runtime: AppRuntime> {
   }
 
   /// Launches once. Choosing configuration mode leaves the runtime factory untouched.
+  ///
+  /// Does nothing once the lifecycle has launched, so repeated calls are safe.
   public func launch(in mode: LaunchMode = .normal) {
-    guard !isConstructing, case .idle = committedPhase else { return }
+    guard !isReentryFromFactory(), case .idle = committedPhase else { return }
 
     switch mode {
       case .normal:
@@ -108,8 +111,11 @@ public final class AppLifecycle<Runtime: AppRuntime> {
   }
 
   /// Starts a fresh runtime from configuration mode or retries a failed startup.
+  ///
+  /// Does nothing in any other phase, so a repeated or late request, such as a
+  /// second click on a start button, is safe.
   public func startRunning() {
-    guard !isConstructing else { return }
+    guard !isReentryFromFactory() else { return }
 
     switch committedPhase {
       case .configuration, .failed(.startup):
@@ -124,8 +130,11 @@ public final class AppLifecycle<Runtime: AppRuntime> {
   /// From a running app, this withdraws the runtime immediately and schedules
   /// shutdown. A command handled by the old runtime can submit the request and
   /// return, allowing shutdown to drain the runtime's outstanding work.
+  ///
+  /// Does nothing in any other phase, so a request made while a transition is
+  /// already under way, such as a menu command during shutdown, is safe.
   public func enterConfiguration() {
-    guard !isConstructing else { return }
+    guard !isReentryFromFactory() else { return }
 
     switch committedPhase {
       case .running(let runtime, _):
@@ -138,11 +147,25 @@ public final class AppLifecycle<Runtime: AppRuntime> {
   }
 
   /// Retries shutdown on the same runtime after a failed shutdown.
+  ///
+  /// Does nothing unless shutdown has failed, so repeated requests are safe.
   public func retryShutdown() {
-    guard !isConstructing, case .failed(.shutdown(_, let startupError)) = committedPhase, let pendingShutdown
+    guard !isReentryFromFactory(), case .failed(.shutdown(_, let startupError)) = committedPhase, let pendingShutdown
     else { return }
 
     beginShutdown(of: pendingShutdown, startupError: startupError)
+  }
+
+  /// Reports a lifecycle request made from inside the runtime factory.
+  ///
+  /// The factory must not call back into the lifecycle. Debug builds stop at
+  /// the faulty call; release builds ignore the request, which would otherwise
+  /// construct runtimes recursively.
+  private func isReentryFromFactory() -> Bool {
+    guard isConstructing else { return false }
+
+    assertionFailure("The runtime factory must not call back into the lifecycle.")
+    return true
   }
 
   /// Constructs a runtime, publishes its early context, then schedules its asynchronous startup.

@@ -259,27 +259,18 @@ struct AppLifecycleTests {
     }
   }
 
-  /// A factory that calls back into the lifecycle cannot start a second runtime or leave the first.
+  /// A factory that calls back into the lifecycle stops a debug build at the faulty call.
   @Test
-  func factoryCannotReenterTheLifecycle() async {
-    var creations = 0
-    var lifecycle: AppLifecycle<LifecycleTestRuntime>?
-    lifecycle = AppLifecycle {
-      creations += 1
-      lifecycle?.launch()
-      lifecycle?.startRunning()
-      lifecycle?.enterConfiguration()
-      return LifecycleTestRuntime(configuration: creations)
-    }
-    defer { lifecycle = nil }
-
-    lifecycle?.launch()
-    await lifecycle?.transitionTask?.value
-
-    #expect(creations == 1)
-    guard case .running = lifecycle?.phase else {
-      Issue.record("Expected the one constructed runtime to run")
-      return
+  func factoryReentryIsAProgrammerError() async {
+    await #expect(processExitsWith: .failure) {
+      await MainActor.run {
+        var lifecycle: AppLifecycle<LifecycleTestRuntime>?
+        lifecycle = AppLifecycle {
+          lifecycle?.launch()
+          return LifecycleTestRuntime(configuration: 0)
+        }
+        lifecycle?.launch()
+      }
     }
   }
 

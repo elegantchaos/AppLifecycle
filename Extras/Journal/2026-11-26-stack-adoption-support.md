@@ -37,3 +37,7 @@ The factory now runs synchronously inside `launch()` and `startRunning()`, and t
 While the factory runs, the published phase still describes the state before it, so a private construction flag rejects lifecycle requests made from inside the factory. Tests cover immediate publication of the startup context, synchronous factory failure, and a factory that calls `launch()`, `startRunning()` and `enterConfiguration()`. The first two failed before the change. The re-entry test passed on the old code, where `.preparing` acted as the guard. With the new guard disabled, it overflowed the stack and crashed the run.
 
 `agt validate --target Application` passed, `agt format` found nothing, and TestApplication built for macOS with its catalog resynced.
+
+## Follow-up: Request Guards
+
+The lifecycle's request guards serve two different purposes. The phase checks in `launch()`, `startRunning()`, `enterConfiguration()` and `retryShutdown()` make requests idempotent: a repeated click, a menu command during shutdown or a phase observer's request is legitimate, and only the lifecycle can check the phase without racing it. They stay as silent no-ops, now documented on each method. A request from inside the runtime factory has no legitimate use, so it now fails an assertion in debug builds and is still ignored in release builds, where it would otherwise recurse. An exit test expects a failing exit when a factory calls `launch()`. It failed before the change, when the call was ignored and the process exited successfully. The release behaviour is not covered by a test.
