@@ -26,4 +26,4 @@ The package's string catalog and `defaultLocalization` are gone. The default vie
 
 ## Validation
 
-`agt validate --target Application` passed with the new suite, and `agt format` found nothing in 36 files. TestApplication built for macOS. The watchOS build is reported separately below.
+`agt validate --target Application` passed with the new suite, and `agt format` found nothing in 36 files. TestApplication built for macOS. `agt validate --full --platforms watchOS --test-platforms macOS` at `846d6fb` built the package for watchOS and passed the macOS tests. The watchOS build was not run on a device or simulator, and the full validation across every platform has not run.
