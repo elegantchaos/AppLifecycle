@@ -2,6 +2,7 @@
 
 ## 2026-11-26
 
+- [Full Review of Application](2026-11-26-full-review-application.md) reviews the lifecycle and monitoring APIs and records the reproduced ownership defects.
 - [Proposed Maintenance Lifecycle](2026-11-26-maintenance-lifecycle.md) records the lifecycle investigation, the per-run runtime API, and the standalone counter demo.
 
 ## 2026-10-27
