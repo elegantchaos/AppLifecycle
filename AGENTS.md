@@ -19,7 +19,8 @@
 
 - Follow the `baseline:standards` skill for all coding.
 - Use the `baseline:review` skill for reviewing pull requests and completed work.
-- Use the `codex-git` skill for git and GitHub operations.
+- Use the `baseline:records` skill for the development journal and decision log.
+- Use the `baseline:git` skill for git and GitHub operations.
 - Use the `swift:language` skill for all Swift code.
 - Also use the `swift:swiftui` skill for SwiftUI code.
 - Also use the `swift:testing` skill for Swift Testing work.
