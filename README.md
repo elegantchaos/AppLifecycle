@@ -6,11 +6,11 @@
 
 ### Motivation
 
-Show a responsive interface as soon as the app has enough services to support it. The startup view can use lightweight services immediately while the app loads storage or other dependencies. The running view receives the full environment once startup succeeds, so ordinary screens can assume their services are ready.
+A SwiftUI app should show a responsive interface while it opens its database and starts its services. A shoebox app, for example, already knows which library to open at launch. AppLifecycle lets it show a startup view immediately and hands the main windows, Settings and commands a ready runtime once startup succeeds. If startup fails, the app can explain what happened and offer a retry.
 
-Give configuration and repair a place outside the normal runtime. An app can enter configuration before opening resources, or shut down the current runtime before entering it. This gives the app a chance to change a setting, switch storage, or repair data while normal services are stopped. Continuing creates a fresh runtime in the same process with the new configuration.
+Some changes need exclusive access to the app’s data. To switch libraries or repair a database, the app can launch in configuration mode before opening its normal services, or enter configuration once those services have shut down. When the work is done, it starts a fresh runtime in the same process. It can also restart directly to apply a setting or reload.
 
-Keep those transitions in one coordinator so windows and commands can follow the same phase. Apps can supply their own startup, configuration, and error screens as needed, and a small app can rely on the standard views.
+AppLifecycle coordinates these transitions across the app. It supplies default views for startup, configuration and failure, and apps can provide their own.
 
 ### Getting started
 
