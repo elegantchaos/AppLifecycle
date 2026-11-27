@@ -38,6 +38,7 @@ final class LifecycleTestRuntime: AppRuntime {
   func shutdown() async throws { try await onShutdown() }
 
   /// A setting shared by the startup and running interfaces.
+  @MainActor
   final class StartupContext {
     /// Whether the interface should show details.
     var showsDetails = false

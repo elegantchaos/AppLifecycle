@@ -36,8 +36,8 @@ public final class AppLifecycle<Runtime: AppRuntime> {
   /// Creates a fresh runtime without starting it.
   private let makeRuntime: @MainActor () throws -> Runtime
 
-  /// Keeps a partially stopped runtime available for another shutdown attempt.
-  @ObservationIgnored private var pendingShutdown: Runtime?
+  /// Holds a partially stopped runtime and its destination for another shutdown attempt.
+  @ObservationIgnored private var pendingShutdown: (runtime: Runtime, destination: ShutdownDestination)?
 
   /// Whether the runtime factory is running.
   ///
@@ -46,7 +46,7 @@ public final class AppLifecycle<Runtime: AppRuntime> {
   /// catch a request made from inside the factory.
   @ObservationIgnored private var isConstructing = false
 
-  /// Requests from `runningRuntime()` waiting for the next phase change, by request.
+  /// Suspended runtime requests waiting for the next phase change, keyed by request ID.
   @ObservationIgnored private var phaseWaiters: [UUID: CheckedContinuation<Void, any Error>] = [:]
 
   /// Work owned by the lifecycle, independent of the requesting view or command.
@@ -81,6 +81,15 @@ public final class AppLifecycle<Runtime: AppRuntime> {
   /// The runtime can later shut down, so use it for the work at hand rather
   /// than keeping it.
   public func runningRuntime() async throws -> Runtime {
+    try await runningRuntime(waitingThroughConfiguration: false)
+  }
+
+  /// Returns the running runtime, optionally remaining suspended during configuration.
+  ///
+  /// With `waitingThroughConfiguration` enabled, a caller may wait until the host starts
+  /// another run. Startup and shutdown failures still throw the underlying error.
+  /// Cancelling the caller ends its wait without affecting the lifecycle.
+  public func runningRuntime(waitingThroughConfiguration: Bool) async throws -> Runtime {
     while true {
       try Task.checkCancellation()
       switch committedPhase {
@@ -88,9 +97,9 @@ public final class AppLifecycle<Runtime: AppRuntime> {
           return runtime
         case .failed(let failure):
           throw failure.error
-        case .configuration:
+        case .configuration where !waitingThroughConfiguration:
           throw AppLifecycleError.configurationMode
-        case .idle, .starting, .shuttingDown:
+        case .idle, .starting, .shuttingDown, .configuration:
           try await nextPublication()
       }
     }
@@ -138,7 +147,7 @@ public final class AppLifecycle<Runtime: AppRuntime> {
 
     switch committedPhase {
       case .running(let runtime, _):
-        beginShutdown(of: runtime, startupError: nil)
+        beginShutdown(of: runtime, destination: .configuration)
       case .failed(.startup):
         publish(.configuration)
       default:
@@ -146,14 +155,23 @@ public final class AppLifecycle<Runtime: AppRuntime> {
     }
   }
 
-  /// Retries shutdown on the same runtime after a failed shutdown.
+  /// Withdraws the current runtime and starts a fresh run once shutdown succeeds.
+  ///
+  /// Request this from a running app. Repeated or late requests during a transition
+  /// do nothing. If shutdown fails, retry it to finish the restart.
+  public func restart() {
+    guard !isReentryFromFactory(), case .running(let runtime, _) = committedPhase else { return }
+
+    beginShutdown(of: runtime, destination: .restart)
+  }
+
+  /// Retries shutdown on the same runtime and continues to the original destination.
   ///
   /// Does nothing unless shutdown has failed, so repeated requests are safe.
   public func retryShutdown() {
-    guard !isReentryFromFactory(), case .failed(.shutdown(_, let startupError)) = committedPhase, let pendingShutdown
-    else { return }
+    guard !isReentryFromFactory(), case .failed(.shutdown) = committedPhase, let pendingShutdown else { return }
 
-    beginShutdown(of: pendingShutdown, startupError: startupError)
+    beginShutdown(of: pendingShutdown.runtime, destination: pendingShutdown.destination)
   }
 
   /// Reports a lifecycle request made from inside the runtime factory.
@@ -190,32 +208,38 @@ public final class AppLifecycle<Runtime: AppRuntime> {
         completeTransition(in: .running(runtime, id: UUID()))
       } catch {
         publish(.shuttingDown)
-        await finishShutdown(of: runtime, startupError: error)
+        await finishShutdown(of: runtime, destination: .startupFailure(error))
       }
     }
   }
 
   /// Withdraws the running environment and schedules shutdown.
-  private func beginShutdown(of runtime: Runtime, startupError: (any Error)?) {
+  private func beginShutdown(of runtime: Runtime, destination: ShutdownDestination) {
     publish(.shuttingDown)
     transitionTask = Task {
-      await finishShutdown(of: runtime, startupError: startupError)
+      await finishShutdown(of: runtime, destination: destination)
     }
   }
 
-  /// Publishes the safe destination after shutdown, or holds the runtime for retry.
-  private func finishShutdown(of runtime: Runtime, startupError: (any Error)?) async {
+  /// Continues to the destination after shutdown, or keeps the work available for retry.
+  private func finishShutdown(of runtime: Runtime, destination: ShutdownDestination) async {
     do {
       try await runtime.shutdown()
-      pendingShutdown = nil
-      if let startupError {
-        completeTransition(in: .failed(.startup(startupError)))
-      } else {
-        completeTransition(in: .configuration)
-      }
     } catch {
-      pendingShutdown = runtime
-      completeTransition(in: .failed(.shutdown(error, startupError: startupError)))
+      pendingShutdown = (runtime, destination)
+      completeTransition(in: .failed(.shutdown(error, startupError: destination.startupError)))
+      return
+    }
+
+    pendingShutdown = nil
+    switch destination {
+      case .configuration:
+        completeTransition(in: .configuration)
+      case .restart:
+        transitionTask = nil
+        beginStartup()
+      case .startupFailure(let error):
+        completeTransition(in: .failed(.startup(error)))
     }
   }
 
@@ -276,17 +300,40 @@ public final class AppLifecycle<Runtime: AppRuntime> {
     phaseWaiters.removeValue(forKey: id)?.resume(throwing: CancellationError())
   }
 
+  /// What should happen once the runtime releases its resources.
+  private enum ShutdownDestination {
+    /// Allow the host to configure or repair resources.
+    case configuration
+
+    /// Start a fresh run immediately.
+    case restart
+
+    /// Report a startup failure once partial startup has been cleaned up.
+    case startupFailure(any Error)
+
+    /// The original startup failure, if teardown is cleaning up partial startup.
+    var startupError: (any Error)? {
+      guard case .startupFailure(let error) = self else { return nil }
+      return error
+    }
+  }
+
   /// Selects the application's initial destination.
-  public enum LaunchMode {
+  public nonisolated enum LaunchMode: Sendable, Equatable {
     /// Construct and start the normal runtime.
     case normal
 
     /// Open configuration mode before constructing any normal services.
     case configuration
+
+    /// Reads the `--configuration` flag from the arguments supplied by the host.
+    public static func requested(arguments: [String]) -> Self {
+      arguments.contains("--configuration") ? .configuration : .normal
+    }
   }
 
   /// Determines which environment the application can present.
-  public enum Phase {
+  public nonisolated enum Phase: Sendable {
     /// The host has yet to launch; launching constructs the runtime before returning.
     case idle
 
@@ -304,5 +351,47 @@ public final class AppLifecycle<Runtime: AppRuntime> {
 
     /// Startup or shutdown failed.
     case failed(AppLifecycleFailure)
+
+    /// The runtime available to commands and secondary scenes while running.
+    public var runtime: Runtime? {
+      guard case .running(let runtime, _) = self else { return nil }
+      return runtime
+    }
+
+    /// Whether the host can configure or repair resources.
+    public var isConfiguration: Bool { kind == .configuration }
+
+    /// The phase category for comparisons in `onChange` or `task(id:)`.
+    public var kind: Kind {
+      switch self {
+        case .idle: .idle
+        case .starting: .starting
+        case .running: .running
+        case .shuttingDown: .shuttingDown
+        case .configuration: .configuration
+        case .failed: .failed
+      }
+    }
+
+    /// The phase category without its runtime, run identity or failure details.
+    public enum Kind: Sendable, Equatable {
+      /// The host has yet to launch.
+      case idle
+
+      /// A runtime is starting.
+      case starting
+
+      /// A started runtime is available.
+      case running
+
+      /// The runtime is releasing its resources.
+      case shuttingDown
+
+      /// The host can configure or repair resources.
+      case configuration
+
+      /// Startup or shutdown failed.
+      case failed
+    }
   }
 }

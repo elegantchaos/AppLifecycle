@@ -23,27 +23,24 @@ struct TestApplication: App {
   /// Chooses the launch path without constructing normal services.
   init() {
     let configuration = CounterConfiguration()
-    let startupDelay: Duration? =
-      ProcessInfo.processInfo.arguments.contains("--slow-startup") ? .seconds(5) : nil
+    let arguments = ProcessInfo.processInfo.arguments
+    let startupDelay: Duration? = arguments.contains("--slow-startup") ? .seconds(5) : nil
     let lifecycle = AppLifecycle {
       configuration.makeRuntime(startupDelay: startupDelay)
     }
     _configuration = State(initialValue: configuration)
     _lifecycle = State(initialValue: lifecycle)
-    lifecycle.launch(in: Self.launchMode)
+    lifecycle.launch(in: Self.launchMode(arguments: arguments))
   }
 
   /// Reads the launch argument or the macOS startup modifier.
-  private static var launchMode: AppLifecycle<CounterRuntime>.LaunchMode {
-    if ProcessInfo.processInfo.arguments.contains("--configuration") {
-      return .configuration
-    }
+  private static func launchMode(arguments: [String]) -> AppLifecycle<CounterRuntime>.LaunchMode {
     #if os(macOS)
       if NSEvent.modifierFlags.contains(.shift) {
         return .configuration
       }
     #endif
-    return .normal
+    return .requested(arguments: arguments)
   }
 
   /// Hosts the phase-specific demo environments and the macOS configuration command.
@@ -57,17 +54,9 @@ struct TestApplication: App {
       .commands {
         CommandGroup(after: .appSettings) {
           Button("Configure Counter…", action: lifecycle.enterConfiguration)
-          .disabled(!isRunning)
+          .disabled(lifecycle.phase.runtime == nil)
         }
       }
     #endif
   }
-
-  #if os(macOS)
-    /// Whether the menu can request teardown of an active runtime.
-    private var isRunning: Bool {
-      if case .running = lifecycle.phase { return true }
-      return false
-    }
-  #endif
 }

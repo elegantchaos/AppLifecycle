@@ -1,5 +1,9 @@
 # Development journal
 
+## 2026-11-27
+
+- [Bookish Adoption Improvements](2026-11-27-bookish-adoption.md) adds sendable phases, secondary-scene and recovery helpers, direct restart and opt-in configuration waiting.
+
 ## 2026-11-26
 
 - [Full Review of Application](2026-11-26-full-review-application.md) reviews the lifecycle and monitoring APIs and records the reproduced ownership defects.

@@ -4,7 +4,7 @@
 // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 /// Describes a failed startup or shutdown for an application's error presentation.
-public enum AppLifecycleFailure {
+public nonisolated enum AppLifecycleFailure: Sendable {
   /// Startup failed and any resources acquired by the runtime have been released.
   case startup(any Error)
 
