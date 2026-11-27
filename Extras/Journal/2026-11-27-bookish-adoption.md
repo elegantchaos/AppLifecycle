@@ -5,3 +5,5 @@ The [lifecycle API](../../Sources/AppLifecycle/AppLifecycle.swift) now publishes
 Restart shuts down the current runtime and starts a new one directly. Retrying a failed teardown resumes the original destination, including restart. Callers can opt into waiting through configuration without changing the default fail-fast behavior. The launch-mode helper handles the flag and the demo still handles its macOS modifier.
 
 The [README](../../README.md) shows a lazy host-owned factory, secondary scene and command integration, and a single host-owned observation task for repair. The runtime regression tests reproduced failures against the stub APIs before restart and the configuration wait were implemented.
+
+The four-platform validation exposed that the existing factory re-entry exit test cannot compile on iOS. The test now runs on macOS in debug builds, where Swift Testing supports subprocess exit tests and the factory assertion is enabled.

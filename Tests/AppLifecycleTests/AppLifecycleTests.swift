@@ -292,20 +292,22 @@ struct AppLifecycleTests {
     }
   }
 
-  /// A factory that calls back into the lifecycle stops a debug build at the faulty call.
-  @Test
-  func factoryReentryIsAProgrammerError() async {
-    await #expect(processExitsWith: .failure) {
-      await MainActor.run {
-        var lifecycle: AppLifecycle<LifecycleTestRuntime>?
-        lifecycle = AppLifecycle {
+  #if os(macOS) && DEBUG
+    /// A factory that calls back into the lifecycle stops a debug build at the faulty call.
+    @Test
+    func factoryReentryIsAProgrammerError() async {
+      await #expect(processExitsWith: .failure) {
+        await MainActor.run {
+          var lifecycle: AppLifecycle<LifecycleTestRuntime>?
+          lifecycle = AppLifecycle {
+            lifecycle?.launch()
+            return LifecycleTestRuntime(configuration: 0)
+          }
           lifecycle?.launch()
-          return LifecycleTestRuntime(configuration: 0)
         }
-        lifecycle?.launch()
       }
     }
-  }
+  #endif
 
   /// The failure builder supplies an action that enters configuration after startup fails.
   @Test
