@@ -14,6 +14,39 @@ import Testing
 @MainActor
 @Suite(.timeLimit(.minutes(1)))
 struct AppLifecycleTests {
+  /// The launch helper recognises the exact flag anywhere in the argument list.
+  @Test
+  func requestsConfigurationByArgument() {
+    typealias LaunchMode = AppLifecycle<LifecycleTestRuntime>.LaunchMode
+    #expect(LaunchMode.requested(arguments: []) == .normal)
+    #expect(LaunchMode.requested(arguments: ["Demo", "--configuration"]) == .configuration)
+    #expect(LaunchMode.requested(arguments: ["Demo", "--configuration-file"]) == .normal)
+  }
+
+  /// Observations can consume the full phase, and its accessors work across the lifecycle.
+  @Test
+  func observesCompletePhase() async throws {
+    let lifecycle = AppLifecycle { LifecycleTestRuntime(configuration: 0) }
+    var phases = Observations { lifecycle.phase }.makeAsyncIterator()
+
+    let idle = try #require(await phases.next())
+    #expect(idle.kind == .idle)
+    #expect(idle.runtime == nil)
+
+    lifecycle.launch(in: .configuration)
+    let configuration = try #require(await phases.next())
+    #expect(configuration.kind == .configuration)
+    #expect(configuration.isConfiguration)
+    #expect(configuration.runtime == nil)
+
+    lifecycle.startRunning()
+    let started = try await lifecycle.runningRuntime()
+    let running = try #require(await phases.next())
+    #expect(running.kind == .running)
+    #expect(running.isConfiguration == false)
+    #expect(running.runtime === started)
+  }
+
   /// Launching into configuration mode leaves runtime construction until an explicit start.
   @Test
   func configurationLaunchSkipsRuntimeConstruction() async throws {
@@ -274,6 +307,29 @@ struct AppLifecycleTests {
     }
   }
 
+  /// The failure builder supplies an action that enters configuration after startup fails.
+  @Test
+  func failureBuilderCanEnterConfiguration() throws {
+    let lifecycle = AppLifecycle<LifecycleTestRuntime> { throw LifecycleTestRuntime.Failure.startup }
+    var configure: (@MainActor () -> Void)?
+
+    /// Captures the action the failure view would give its button.
+    func capture(_ action: @escaping @MainActor () -> Void) -> EmptyView {
+      configure = action
+      return EmptyView()
+    }
+
+    lifecycle.launch()
+    _ = lifecycle.rootView(
+      running: { _ in EmptyView() },
+      startup: { _ in EmptyView() },
+      failure: { _, _, enterConfiguration in capture(enterConfiguration) }
+    )
+    let enterConfiguration = try #require(configure)
+    enterConfiguration()
+    #expect(lifecycle.phase.isConfiguration)
+  }
+
   /// A factory failure can be retried without shutting down a runtime.
   @Test
   func failedFactoryCanRetryStartup() async throws {
@@ -447,6 +503,7 @@ struct AppLifecycleTests {
       return
     }
     _ = lifecycle.rootView { _ in Text("Ready") }
+    _ = lifecycle.runningView { _ in Text("Ready") }
 
     lifecycle.enterConfiguration()
     let shutdown = try #require(lifecycle.transitionTask)
@@ -475,7 +532,8 @@ struct AppLifecycleTests {
     #expect(runtime.didStart)
     _ = lifecycle.rootView(
       running: { _ in Text("Ready") },
-      startup: { _ in Text("Starting") }
+      startup: { _ in Text("Starting") },
+      failure: { _, retry in Button("Retry", action: retry) }
     )
 
     lifecycle.enterConfiguration()

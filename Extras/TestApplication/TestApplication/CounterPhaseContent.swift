@@ -37,13 +37,13 @@ struct CounterPhaseContent: View {
       }
     } shutdown: {
       ProgressView("Waiting for shutdown to finish…")
-    } failure: { failure, retry in
+    } failure: { failure, retry, enterConfiguration in
       switch failure {
         case .startup(let error):
           VStack(alignment: .leading, spacing: 12) {
             Text(error.localizedDescription)
             Button("Retry Startup", action: retry)
-            Button("Configure Counter…", action: lifecycle.enterConfiguration)
+            Button("Configure Counter…", action: enterConfiguration)
           }
         case .shutdown(let error, let startupError):
           VStack(alignment: .leading, spacing: 12) {

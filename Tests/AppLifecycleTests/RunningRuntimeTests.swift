@@ -88,6 +88,32 @@ struct RunningRuntimeTests {
     }
   }
 
+  /// An opt-in request waits for a fresh runtime even if configuration is already showing.
+  @Test
+  func waitsThroughConfiguration() async throws {
+    let lifecycle = AppLifecycle { LifecycleTestRuntime(configuration: 1) }
+    lifecycle.launch(in: .configuration)
+    let request = Task.immediate { try await lifecycle.runningRuntime(waitingThroughConfiguration: true) }
+
+    lifecycle.startRunning()
+
+    let runtime = try await request.value
+    #expect(runtime.configuration == 1)
+  }
+
+  /// Cancellation releases a request parked in configuration, without a phase transition.
+  @Test
+  func cancellationEndsTheWaitInConfiguration() async {
+    let lifecycle = AppLifecycle { LifecycleTestRuntime(configuration: 0) }
+    lifecycle.launch(in: .configuration)
+    let request = Task.immediate { try await lifecycle.runningRuntime(waitingThroughConfiguration: true) }
+
+    request.cancel()
+    await #expect(throws: CancellationError.self) {
+      try await request.value
+    }
+  }
+
   /// Cancelling a waiting request ends it without waiting for the lifecycle.
   @Test
   func cancellationEndsTheWait() async {

@@ -13,11 +13,12 @@
 ///
 /// The lifecycle calls startup once per instance and makes the runtime available
 /// to the running environment only on success. It calls shutdown before
-/// configuration mode, and after a startup failure before a retry can construct
-/// another runtime.
-@MainActor public protocol AppRuntime: AnyObject {
+/// configuration or restart, and after a startup failure before a retry can
+/// construct another runtime. The early context must be sendable so observers
+/// can receive the phase that carries it.
+@MainActor public protocol AppRuntime: AnyObject, Sendable {
   /// The services and state that are ready as soon as the runtime is constructed.
-  associatedtype StartupContext = Void
+  associatedtype StartupContext: Sendable = Void
 
   /// Exposes only the dependencies safe to use before asynchronous startup finishes.
   var startupContext: StartupContext { get }
